@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, decode, collect_list, to_json
+import subprocess
 
 # Tạo Spark session
 spark = SparkSession.builder \
@@ -26,7 +27,14 @@ aggregated_json_df = kafka_value_df \
 # Biến toàn cục để đếm số file
 file_count = 0
 
-# Hàm lưu dữ liệu vào HDFS với tên file tăng dần
+# Hàm để xóa tất cả các file trong thư mục HDFS
+def clear_hdfs_directory(hdfs_directory):
+    try:
+        subprocess.run(["hdfs", "dfs", "-rm", "-r", hdfs_directory], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error deleting directory {hdfs_directory}: {e}")
+
+# Hàm lưu dữ liệu vào HDFS với tên file tăng dần và xóa file cũ
 def save_to_hdfs(batch_df, batch_id):
     global file_count
     # Tăng giá trị của file_count
@@ -37,6 +45,10 @@ def save_to_hdfs(batch_df, batch_id):
     
     # Lưu vào HDFS nếu không trống
     if json_row and json_row["aggregated_json"]:
+        # Xóa các file cũ trong HDFS
+        hdfs_directory = "hdfs://localhost:9000/iot_sensor_data/*"
+        clear_hdfs_directory(hdfs_directory)
+        
         # Tạo RDD từ chuỗi JSON
         rdd = spark.sparkContext.parallelize([json_row["aggregated_json"]])
         
