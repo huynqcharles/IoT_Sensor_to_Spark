@@ -42,7 +42,7 @@ try:
             print("JSON DATA:", json.dumps(data, indent=4))  # Print JSON data to terminal
             producer.send('sensor-data', value=data)  # Send data to Kafka topic
             print("DATA SENT TO KAFKA")
-        time.sleep(5)  # Wait 5 seconds before calling the API again
+#        time.sleep(5)  # Wait 5 seconds before calling the API again
 except KeyboardInterrupt:
     print("STOP SENDING DATA")
 finally:
