@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, decode, from_json, expr
+from pyspark.sql.functions import col, decode, from_json, expr, to_timestamp
 from pyspark.sql.types import StructType, StructField, StringType, FloatType
 
 # Create Spark session
@@ -14,12 +14,12 @@ spark.sparkContext.setLogLevel("ERROR")
 # Define schema for data from WeatherAPI
 weather_schema = StructType([
     StructField("location", StructType([
-        StructField("name", StringType(), True),
+        StructField("name", StringType(), True),  # This will be used as location_name
         StructField("country", StringType(), True),
         StructField("localtime", StringType(), True)
     ])),
     StructField("current", StructType([
-        StructField("last_updated", StringType(), True),  # Use as ID
+        StructField("last_updated", StringType(), True),  # Use as ID, will be converted to TIMESTAMP
         StructField("temp_c", StringType(), True),
         StructField("wind_kph", StringType(), True),
         StructField("pressure_mb", StringType(), True),
@@ -46,7 +46,8 @@ weather_data_df = kafka_value_df.select(from_json(col("json_value"), weather_sch
 
 # Extract specific fields and cast to appropriate types
 processed_df = weather_data_df.select(
-    col("data.current.last_updated").alias("last_updated"),
+    col("data.location.name").alias("location_name"),  # Extract location name
+    to_timestamp(col("data.current.last_updated"), "yyyy-MM-dd HH:mm:ss").alias("last_updated"),  # Convert to TIMESTAMP
     col("data.current.temp_c").cast(FloatType()).alias("temp_c"),
     col("data.current.wind_kph").cast(FloatType()).alias("wind_kph"),
     col("data.current.pressure_mb").cast(FloatType()).alias("pressure_mb"),
@@ -57,7 +58,7 @@ processed_df = weather_data_df.select(
 # Write data to Cassandra
 query = processed_df.writeStream \
     .format("org.apache.spark.sql.cassandra") \
-    .options(table="weather_data_numeric", keyspace="sensor_data") \
+    .options(table="weather_data", keyspace="sensor_data") \
     .option("checkpointLocation", "/tmp/checkpoints_weather") \
     .outputMode("append") \
     .start()
